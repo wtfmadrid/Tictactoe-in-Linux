@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Function to print the game board
+print_board() {
+    echo " ${board[0]} | ${board[1]} | ${board[2]} "
+    echo "---------"
+    echo " ${board[3]} | ${board[4]} | ${board[5]} "
+    echo "---------"
+    echo " ${board[6]} | ${board[7]} | ${board[8]} "
+}
+
+# Function to check if a player has won
+check_winner() {
+    local symbol=$1
+    local winning_combinations=(
+        "0 1 2" "3 4 5" "6 7 8" # Rows
+        "0 3 6" "1 4 7" "2 5 8" # Columns
+        "0 4 8" "2 4 6"          # Diagonals
+    )
+
+    for combo in "${winning_combinations[@]}"; do
+        local a=${combo:0:1}
+        local b=${combo:2:1}
+        local c=${combo:4:1}
+
+        if [[ ${board[a]} == $symbol && ${board[b]} == $symbol && ${board[c]} == $symbol ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Error checks for command-line arguments
+# Check if the first argument is X or O
+if [[ $1 != "X" && $1 != "O" ]]; then
+    echo "Arg 1: must be X or O" >&2
+    exit 1
+fi
+
+symbol="$1"
+
+# Check if the second argument is a readable file
+if [[ ! -r $2 ]]; then
+    echo "Arg 2: Must be a readable file" >&2
+    exit 2
+fi
+
+input_file=$2
+
+# Read the moves from the input file
+moves=$(<"$input_file")
+
+# Check if the number of moves is not 9
+if [[ $(wc -w <<< "$moves") -ne 9 ]]; then
+    echo "Arg 2: File must contain 9 integers" >&2
+    exit 3
+fi
+
+# Check if the moves are a permutation of unique integers from 1 to 9
+if [[ ! $moves =~ ^([1-9] ){8}[1-9]$ ]]; then
+    echo "Arg 2: File must contain unique integers from 1 to 9" >&2
+    exit 4
+fi
+
+# Initialize the game board with dashes
+board=("-" "-" "-" "-" "-" "-" "-" "-" "-")
+
+# Assign the moves to the board
+for move in $moves; do
+    # Validate the move is within the range 1-9
+    if (( move < 1 || move > 9 )); then
+        echo "Invalid move: Move $move is out of range" >&2
+        exit 5
+    fi
+
+    board_index=$((move - 1))
+
+    # Check if the board position is already filled
+    if [[ ${board[board_index]} != "-" ]]; then
+        echo "Invalid move: Board position $move is already filled" >&2
+        exit 5
+    fi
+
+    board[board_index]=$symbol
+
+    # Check if the current player wins
+    check_winner "$symbol"
+    if [[ $? -eq 0 ]]; then
+        print_board
+        echo "$symbol is the winner!"
+        exit 6
+    fi
+
+    # Alternate the player's symbol
+    if [[ $symbol == "X" ]]; then
+        symbol="O"
+    else
+        symbol="X"
+    fi
+done
+
+# All moves have been made, print the final game board
+print_board
+
+# Check if the game ends in a tie
+if [[ $(grep -c "-" <<< "$(printf "%s" "${board[@]}")") -eq 0 ]]; then
+    echo "The game ends in a tie."
+    exit 7
+fi
